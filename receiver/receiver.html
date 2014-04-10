@@ -1,0 +1,235 @@
+<!--
+Copyright (C) 2014 Google Inc. All Rights Reserved.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+     http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
+<!DOCTYPE html>
+<html>
+<head>
+<style type="text/css">
+body {
+	overflow: hidden;
+}
+
+#welcome {
+	width: 1024px;
+	height: 960px;
+	text-align: center;
+	margin: 0 auto;
+	font-weight: bold;
+	font-family: Verdana, Geneva, sans-serif;
+	background-color: #000000;
+	color: #FFFFFF;
+	margin-top: 300px;
+}
+
+#gametitle {
+	text-align: center;
+	font-size: 80px;
+}
+
+#message {
+	text-align: center;
+	font-size: 40px;
+	margin-top: 100px;
+}
+
+#count {
+	text-align: center;
+	font-size: 20px;
+	margin-top: 20px;
+	color: red;
+}
+
+#goodanswer {
+	text-align: center;
+	font-size: 20px;
+	margin-top: 20px;
+	color: blue;
+}
+</style>
+<title>Google Cast Puzzle Game</title>
+</head>
+<body>
+	<div id="welcome">
+		<DIV id="gametitle">Google Cast Puzzle Game</DIV>
+		<DIV id="message">Click "Join" to Play</DIV>
+		<DIV id="count"></DIV>
+		<DIV id="goodanswer"></DIV>
+	</div>
+	<script type="text/javascript"
+		src="//www.gstatic.com/cast/sdk/libs/receiver/2.0.0/cast_receiver.js"></script>
+	<script src="//code.jquery.com/jquery-1.10.2.js"></script>
+	<script type="text/javascript">
+		max_palyer_number = 3;
+		joined_player_number = 0;
+		answer_buffer = new Array();
+		qa_list = null;
+		current_question = 0;
+		window.onload = function() {
+			cast.receiver.logger.setLevelValue(0);
+			window.castReceiverManager = cast.receiver.CastReceiverManager
+					.getInstance();
+			console.log('Starting Receiver Manager');
+
+			// handler for the 'ready' event
+			castReceiverManager.onReady = function(event) {
+				console.log('Received Ready event: '
+						+ JSON.stringify(event.data));
+				window.castReceiverManager
+						.setApplicationState("Application status is ready...");
+			};
+
+			// handler for 'senderconnected' event
+			castReceiverManager.onSenderConnected = function(event) {
+				console.log('Received Sender Connected event: ' + event.data);
+				console
+						.log(window.castReceiverManager.getSender(event.data).userAgent);
+			};
+
+			// handler for 'senderdisconnected' event
+			castReceiverManager.onSenderDisconnected = function(event) {
+				console
+						.log('Received Sender Disconnected event: '
+								+ event.data);
+				if (window.castReceiverManager.getSenders().length == 0) {
+					window.close();
+				}
+			};
+
+			// create a CastMessageBus to handle messages for a custom namespace
+			window.messageBus = window.castReceiverManager
+					.getCastMessageBus('urn:x-cast:com.google.cast.sample.puzzlegame');
+
+			function showQuestion() {
+				if (current_question < qa_list.length) {
+					question = qa_list[current_question];
+					document.getElementById("message").innerHTML = question["quesiton"];
+					changeCountText(current_question + 1, qa_list.length);
+					window.messageBus.broadcast(JSON.stringify({
+						"status" : "choose",
+						"candidates" : question["candidate_answers"]
+					}));
+					$("#goodanswer").empty();
+				} else {
+					document.getElementById("message").innerHTML = "End! Play again!";
+					window.messageBus.broadcast(JSON.stringify({
+						"status" : "end"
+					}));
+					joined_player_number = 0;
+					answer_buffer = new Array();
+					current_question = 0;
+					$("#goodanswer").empty();
+				}
+
+			}
+
+			// handler for the CastMessageBus message event
+			window.messageBus.onMessage = function(event) {
+				console.log('Message [' + event.senderId + ']: ' + event.data);
+				// display the message from the sender
+				data = JSON.parse(event.data);
+				switch (data.cmd) {
+				case "join":
+					if (joined_player_number < max_palyer_number) {
+						joined_player_number += 1;
+						window.messageBus.send(event.senderId, JSON
+								.stringify({
+									"status" : "wait",
+									"client_id": event.senderId
+								}));
+						changeCountText(joined_player_number,
+								max_palyer_number);
+						if (joined_player_number == max_palyer_number) {
+							window.messageBus.broadcast(JSON.stringify({
+								"status" : "ready"
+							}));
+							dt = document.getElementById("gametitle");
+							dt.style.display = "None";
+							showQuestion();
+						} 
+					} else {
+						window.messageBus.send(event.senderId, JSON.stringify({
+							"status" : "reject"
+						}));
+					}
+
+					console.log('joined_player_number:' + joined_player_number);
+					break;
+				case "answer":
+					var answer = {
+						"senderId" : event.senderId,
+						"value" : data.value
+					};
+					answer_buffer.push(answer);
+					window.messageBus.send(event.senderId, JSON.stringify({
+						"status" : "check"
+					}));
+
+					if (answer_buffer.length == max_palyer_number) {
+						console.log(answer_buffer);
+						true_answer = qa_list[current_question]["true_answer"];
+
+						$("#goodanswer").append(
+								"Answer:" + true_answer + "<br>");
+
+						for ( var i = 0; i < max_palyer_number; i++) {
+							result = true_answer != answer_buffer[i]["value"] ? "Bad"
+									: "Good";
+							$("#goodanswer").append(
+									answer_buffer[i]["senderId"]
+											+ "'answer is " + result + "<br>")
+						}
+						answer_buffer = new Array();
+						current_question += 1;
+						setTimeout(showQuestion, 3000)
+					}
+					break;
+				default:
+					break;
+				}
+
+				// inform all senders on the CastMessageBus of the incoming message event
+				// sender message listener will be invoked
+				//window.messageBus.send(event.senderId, event.data);
+			}
+
+			// initialize the CastReceiverManager with an application status message
+			window.castReceiverManager.start({
+				statusText : "Application is starting"
+			});
+			console.log('Receiver Manager started');
+
+			//load QA list
+
+			$.getJSON("qa.json", function(data) {
+				console.log(data);
+				qa_list = data;
+			})
+			changeCountText(0, max_palyer_number);
+
+		};
+
+		// utility function to display the text message in the input field
+		function changeCountText(num, all) {
+			console.log("people num:" + num);
+			document.getElementById("count").innerHTML = num + "/" + all;
+		}
+		function displayText(text) {
+			console.log(text);
+			document.getElementById("message").innerHTML = text;
+			window.castReceiverManager.setApplicationState(text);
+		};
+	</script>
+</body>
+</html>
