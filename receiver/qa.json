@@ -1,0 +1,32 @@
+[
+  {
+    "quesiton": "1+1=?",
+    "candidate_answers": [
+      {"code": "A", "desc": "1"},
+      {"code": "B", "desc": "2"},
+      {"code": "C", "desc": "3"},
+      {"code": "D", "desc": "4"}
+    ],
+    "true_answer": "B"
+  },
+  {
+    "quesiton": "10+10=?",
+    "candidate_answers": [
+      {"code": "A", "desc": "10"},
+      {"code": "B", "desc": "20"},
+      {"code": "C", "desc": "30"},
+      {"code": "D", "desc": "40"}
+    ],
+    "true_answer": "B"
+  },
+  {
+    "quesiton": "100+100=?",
+    "candidate_answers": [
+      {"code": "A", "desc": "100"},
+      {"code": "B", "desc": "200"},
+      {"code": "C", "desc": "300"},
+      {"code": "D", "desc": "400"}
+    ],
+    "true_answer": "B"
+  }
+]
