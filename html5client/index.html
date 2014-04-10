@@ -1,0 +1,339 @@
+<!--
+Copyright (C) 2014 Google Inc. All Rights Reserved.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+     http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
+<!DOCTYPE html>
+<html>
+<head>
+<title>Hello World</title>
+<style type="text/css">
+#wrapper {
+	height: 40px;
+	width: 1024px;
+	margin: 0 auto;
+	text-align: center;
+	margin-top: 200px;
+}
+
+input {
+	font-family: "Arial", Arial, sans-serif;
+	font-size: 20px;
+	font-weight: bold;
+}
+
+#message {
+	height: 50px;
+	width: 1024px;
+	text-align: center;
+	font-family: "Arial", Arial, sans-serif;
+	margin: 0 auto;
+}
+
+#question_title {
+	height: 50px;
+	width: 1024px;
+	margin: 0 auto;
+	font-size: 40px;
+	text-align: center;
+	margin-top: 200px;
+	font-family: "Arial", Arial, sans-serif;
+}
+
+#choose {
+	height: 100px;
+	width: 1024px;
+	margin: 0 auto;
+	font-size: 20px;
+	text-align: center;
+	margin-top: 10px;
+	font-family: "Arial", Arial, sans-serif;
+}
+
+#next {
+	width: 150px;
+	margin: 0 auto;
+	font-size: 18px;
+	text-align: center;
+	margin-top: 20px;
+	font-family: "Arial", Arial, sans-serif;
+	margin: 0 auto;
+}
+
+#client_id {
+    width: 150px;
+	margin: 0 auto;
+	font-size: 18px;
+	text-align: center;
+	margin-top: 20px;
+	font-family: "Arial", Arial, sans-serif;
+	margin: 0 auto;
+}
+</style>
+<script type="text/javascript"
+	src="//www.gstatic.com/cv/js/sender/v1/cast_sender.js"></script>
+<script src="//code.jquery.com/jquery-1.10.2.js"></script>
+<script type="text/javascript">
+
+	var applicationID = '58C21293';
+	var namespace = 'urn:x-cast:com.google.cast.sample.puzzlegame';
+	var session = null;
+
+	/**
+	 * Call initialization for Cast
+	 */
+	if (!chrome.cast || !chrome.cast.isAvailable) {
+		setTimeout(initializeCastApi, 1000);
+	}
+
+	/**
+	 * initialization
+	 */
+	function initializeCastApi() {
+		var sessionRequest = new chrome.cast.SessionRequest(applicationID);
+		var apiConfig = new chrome.cast.ApiConfig(sessionRequest,
+				sessionListener, receiverListener);
+
+		chrome.cast.initialize(apiConfig, onInitSuccess, onError);
+	};
+
+	/**
+	 * initialization success callback
+	 */
+	function onInitSuccess() {
+		appendMessage("onInitSuccess");
+	}
+
+	/**
+	 * initialization error callback
+	 */
+	function onError(message) {
+		appendMessage("onError: " + JSON.stringify(message));
+	}
+
+	/**
+	 * generic success callback
+	 */
+	function onSuccess(message) {
+
+		appendMessage("onSuccess: " + message);
+	}
+
+	/**
+	 * callback on success for stopping app
+	 */
+	function onStopAppSuccess() {
+		appendMessage('onStopAppSuccess');
+	}
+
+	/**
+	 * session listener during initialization
+	 */
+	function sessionListener(e) {
+		appendMessage('New session ID:' + e.sessionId);
+		session = e;
+		session.addUpdateListener(sessionUpdateListener);
+		session.addMessageListener(namespace, receiverMessage);
+	}
+
+	/**
+	 * listener for session updates
+	 */
+	function sessionUpdateListener(isAlive) {
+		var message = isAlive ? 'Session Updated' : 'Session Removed';
+		message += ': ' + session.sessionId;
+		appendMessage(message);
+		if (!isAlive) {
+			session = null;
+		}
+	};
+
+	/**
+	 * utility function to log messages from the receiver
+	 * @param {string} namespace The namespace of the message
+	 * @param {string} message A message string
+	 */
+	function receiverMessage(namespace, message) {
+		appendMessage("receiverMessage: " + namespace + ", " + message);
+		json_message = JSON.parse(message)
+		switch (json_message.status) {
+		case "wait":
+			var m = document.getElementById("message");
+			m.innerHTML = "Waiting for other players to Join!";
+			var join = document.getElementById("join");
+			join.disabled = true;
+			$("#client_id").empty();
+			$("#client_id").append(json_message.client_id);
+			break;
+		case "reject":
+			var m = document.getElementById("message");
+			m.innerHTML = "Game Room is Full! Try later!";
+			break;
+		case "ready":
+			//var m = document.getElementById("message");
+			//m.innerHTML = "Choose your answer:";
+			
+			break;
+		case "choose":
+			$("#before")[0].style.display = "none";
+			$("#process")[0].style.display = "block"
+
+			candidates = json_message.candidates;
+			$("#choose").empty();
+			for ( var i = 0; i < candidates.length; i++) {
+
+				input_option = $("<input>", {
+					"type" : "radio",
+					"value" : candidates[i]["code"],
+					"name" : "answer"
+				});
+				$("#choose").append(input_option);
+				$("#choose").append(candidates[i]["code"] + ":" + candidates[i]["desc"]);
+				$("#choose").append("<br>");
+				$("input[type='radio']").change(function() {
+					selected = $(this).val();
+					$("#selected_answer").val(selected)
+				});
+				var next = document.getElementById("nextbutton");
+				next.disabled = false;
+			}
+			break;
+		case "check":
+			$("#question_title").empty();
+			$("#question_title").append("Check answer in the screen!");
+			var next = document.getElementById("nextbutton");
+			next.disabled = true;
+			break;
+		case "end":
+			$("#before")[0].style.display = "block";
+			
+			$("#process")[0].style.display = "none";
+			
+			var m = document.getElementById("message");
+			m.innerHTML = "Click join to play again!";
+			var join = document.getElementById("join");
+			join.disabled = false;
+			break;
+			
+		}
+	};
+
+	/**
+	 * receiver listener during initialization
+	 */
+	function receiverListener(e) {
+		if (e === 'available') {
+			var message = document.getElementById("message");
+			message.innerHTML = "Congratulation! Found Cast Device! Click Join to Play! ";
+			var join = document.getElementById("join");
+			join.disabled = false;
+			appendMessage("receiver found");
+		} else {
+			appendMessage("receiver list empty");
+			//var message = document.getElementById("message");
+			//message.innerHTML = "Congratulation! Found Cast Device, choose one to play!";
+		}
+	}
+
+	/**
+	 * stop app/session
+	 */
+	function stopApp() {
+		session.stop(onStopAppSuccess, onError);
+	}
+
+	/**
+	 * send a message to the receiver using the custom namespace
+	 * receiver CastMessageBus message handler will be invoked
+	 * @param {string} message A message string
+	 */
+	function sendMessage(message) {
+		json_message = JSON.stringify(message);
+		if (session != null) {
+			session.sendMessage(namespace, json_message, onSuccess.bind(this,
+					"Message sent: " + message), onError);
+		} else {
+			chrome.cast.requestSession(function(e) {
+				session = e;
+				session.addUpdateListener(sessionUpdateListener);
+				session.addMessageListener(namespace, receiverMessage);
+				session.sendMessage(namespace, json_message, onSuccess.bind(
+						this, "Message sent: " + message), onError);
+			}, onError);
+		}
+	}
+
+	/**
+	 * append message to debug message window
+	 * @param {string} message A message string
+	 */
+	function appendMessage(message) {
+		console.log(message);
+
+	};
+
+	/**
+	 * utility function to handle text typed in by user in the input field
+	 */
+	function update() {
+		sendMessage(document.getElementById("input").value);
+	}
+
+	/**
+	 * handler for the transcribed text from the speech input
+	 * @param {string} words A transcibed speech string
+	 */
+	function transcribe(words) {
+		sendMessage(words);
+	}
+
+	function joinGame() {
+		sendMessage({
+			"cmd" : "join"
+		});
+	}
+	
+	function nextStep() {
+	  if (!$("#selected_answer").val()) {
+		  alert("Please select your answer!")
+	  }	else {
+     	  sendMessage({
+     		"cmd": "answer",
+			"value" : $("#selected_answer").val()
+		  });
+	  }
+	}
+</script>
+</head>
+<body>
+	<div id="before">
+		<div id="wrapper">
+			<input type="button" id="join" value="Join Game" disabled="disabled"
+				onclick="joinGame()"></input>
+		</div>
+		<div id="message">No Cast Device Found</div>
+	</div>
+	<div id="process"  style="display: none">
+		<div id="question_title">Choose your answer!</div>
+		<div id="choose"></div>
+		<div id="next">
+		    <input type="hidden" id="selected_answer"></input>
+			<input type="button" id ="nextbutton" value="Next" style="width: 100px" onclick="nextStep()"></input>
+		</div>
+		<div id="client_id"></div>
+	</div>
+	</div>
+</body>
+
+
+</html>
